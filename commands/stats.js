@@ -4,6 +4,7 @@
 
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActionRow, ComponentType} = require('discord.js');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+//const {get, set} = require('./cache.js');
 
 async function getValorantData(username, tagline, region){
 	const player = {mmr_change_data: [],
@@ -34,12 +35,11 @@ async function getValorantData(username, tagline, region){
 				const hs = game.stats.headshots/(game.stats.bodyshots + game.stats.headshots + game.stats.legshots)*100;
 				player.stats.headshots.push(hs);
 			}
-			let total_mmr_change = 0;
+			player.total_mmr_change = 0;
 			for (let match of player.mmr.data){	//calculate total mmr change between all data points
 				player.mmr_change_data.push(match.mmr_change_to_last_game);
-				total_mmr_change += match.mmr_change_to_last_game;
+				player.total_mmr_change += match.mmr_change_to_last_game;
 			}
-			player.mmr_change_data.push(total_mmr_change);
 			//const start_date = player.mmr.data[player.mmr.data.length-1].date.split(",")[1];
 			//const end_date = player.mmr.data[0].date.split(",")[1];
 		
@@ -51,7 +51,10 @@ async function getValorantData(username, tagline, region){
 }
 
 function createEmbed(player){
-	const mmr_change = player.mmr.data[0].mmr_change_to_last_game > 0 ? `+${player.mmr.data[0].mmr_change_to_last_game}` : `${player.mmr.data[0].mmr_change_to_last_game}`;	//append "+" if positive
+	let last_change = player.mmr.data[0].mmr_change_to_last_game > 0 ? `+${player.mmr.data[0].mmr_change_to_last_game}` : `${player.mmr.data[0].mmr_change_to_last_game}`;	//append "+" if positive
+	if (player.games[0].currenttier_patched == 'Unrated') {
+		last_change = '-';
+	}
 
 	const row = new ActionRowBuilder()
 			.addComponents(
@@ -86,16 +89,22 @@ function createEmbed(player){
 		.addFields(
 			//{name: 'Level', value: `${player.account.data.account_level}`, inline: true},
 			//{name: 'Region', value: `${player.account.data.region}`, inline: true}, //redundant
-			{name: 'Rank', value: `${player.mmr.data[0].currenttierpatched} (${player.mmr.data[0].ranking_in_tier} RR)`, inline: true},
-			{name: `ELO`, value: `${player.mmr.data[0].elo}`, inline:true},
-			{name: `Change in ${player.mmr.data.length} games`, value: `${player.mmr_change_data.slice(-1)[0]} RR`, inline: true},
+			{name: 'Current Rank', value: `${player.mmr.data[0].currenttierpatched} (${player.mmr.data[0].ranking_in_tier} RR)`, inline: true},
+			//{name: `ELO`, value: `${player.mmr.data[0].elo}`, inline:true},
+			{name: `Change in ${player.mmr.data.length} games`, value: `${player.total_mmr_change} RR`, inline: true},
 			//{name: `HS in ${player.stats.headshots.length} games`, value: `${player.stats.average.toFixed(1)}%`, inline:true},
 			//{name: `MMR History`, value: `${player.mmr_change_data}`}
 			//{name: '--------------------------------------------------------------------', value: "**-------------------------------------------------------------------**"}
 		)
 		.addFields(
-			{name: `Last game statistics`, value: `${mmr_change} RR`},
-			{name: 'Map', value: `${player.history.data[0].metadata.map}`},
+			{name: `Last game statistics`, value: `${last_change} RR`},
+			//{name: '\u200b', value: `\u200b`, inline:true},
+			//{name: `Date`, value: `${player.history.data[0].metadata.game_start_patched.split(",")[1]}`, inline: true},
+
+			{name: 'Map', value: `${player.history.data[0].metadata.map}`, inline:true},
+			{name: 'Score', value: `${player.history.data[0].teams[player.games[0].team.toLowerCase()].rounds_won}-${player.history.data[0].teams[player.games[0].team.toLowerCase()].rounds_lost}`, inline:true},
+			{name: 'Rank (in-game)', value: `${player.games[0].currenttier_patched}`, inline:true},
+
 			{name: 'Agent', value: `${player.games[0].character}`, inline: true},
 			//{name: 'Mode', value: `${player.history.data[0].metadata.mode}`, inline:true},
 			{name: 'K/D/A', value: `${player.games[0].stats.kills}/${player.games[0].stats.deaths}/${player.games[0].stats.assists}`, inline:true},
@@ -105,6 +114,56 @@ function createEmbed(player){
 		.setImage(player.games[0].assets.card.wide)
 		//.setFooter({text: `Last updated: ${player.account.data.last_update}`});
 		return [result, row];
+}
+
+function createScoreboard(player){ //displays data for last game scores
+	player.history.data[0].players.red.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);	//sort the players based on score
+	player.history.data[0].players.blue.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);
+	let red_team = {characters: '',
+					names: '',
+					scores: ''}, 
+	blue_team = {characters: '',
+					names: '',
+					scores: ''};
+	//console.log(player.history.data[0].players.red);
+	for (let p of player.history.data[0].players.red){
+		//const temp = `${p.character} ${p.name} ${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
+		red_team.characters += `${p.character}\n`;
+		red_team.names += `${p.name}\n`;
+		red_team.scores += `${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
+	}
+	for (let p of player.history.data[0].players.blue){
+		//const temp = `${p.character} ${p.name} ${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
+		blue_team.characters += `${p.character}\n`;
+		blue_team.names += `${p.name}\n`;
+		blue_team.scores += `${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;	
+	}
+	// let timeline = '';
+	// for (let round of player.history.data[0].rounds){
+	// 	timeline += (round.winning_team === 'Blue' ? '_ ' : '‾ ')
+	// }
+	const board = new EmbedBuilder()
+		.setColor('69cbb1')
+		.setAuthor({name: `Last game scoreboard`, url: `https://tracker.gg/valorant/match/${player.history.data[0].metadata.matchid}?handle=${player.ign}`})
+		.addFields(
+			{name: '\u200b', value: `\u200b`, inline:true},
+			{name: 'Red', value: `\u200b`, inline: true},
+			{name: '\u200b', value: `\u200b`, inline:true},
+			{name: 'Agent', value: `${red_team.characters}`, inline:true},
+			{name: 'Player', value: `${red_team.names}`, inline:true},
+			{name: 'K/D/A', value: `${red_team.scores}`, inline: true},
+			
+			{name: '\u200b', value: `\u200b`},
+
+			{name: '\u200b', value: `\u200b`, inline:true},
+			{name: 'Blue', value: `\u200b`, inline: true},
+			{name: '\u200b', value: `\u200b`, inline:true},
+			{name: 'Agent', value: `${blue_team.characters}`, inline:true},
+			{name: 'Player', value: `${blue_team.names}`, inline:true},
+			{name: 'K/D/A', value: `${blue_team.scores}`, inline: true},
+			
+		)
+	return board;
 }
 
 module.exports = {
@@ -132,9 +191,11 @@ module.exports = {
 					{name: 'LATAM', value: 'na'},
 				)),
 	async execute(interaction) {
+		const cache = new Map();
+
 		const filter = i => {			
 			//i.deferUpdate();
-			return i.message.interaction.id === interaction.id;	//to make sure button press only affects attached message
+			return i.message.interaction.id === interaction.id;	//to make sure button press only affects message its attached to
 		}
 		const collector = interaction.channel.createMessageComponentCollector({filter: filter, componentType: ComponentType.Button});
 
@@ -150,25 +211,43 @@ module.exports = {
 			return;	
 		}
 		let [embed, buttons] = createEmbed(player);
+		cache.set('embed', embed);	
+		cache.set('buttons', buttons);
+		console.log('Player data saved in cache.');
 		await interaction.followUp({embeds: [embed], components: [buttons]});
 
 		collector.on('collect', async i => {
 			if (i.customId === 'refresh') {
 				console.log(`${i.user.username} refreshed data for ${username}#${tagline}`);
-				buttons.components.find(button => button.data.custom_id == 'refresh').setDisabled(true); //disable refresh button while data is being updated
-				await i.update({embeds: [embed], components: [buttons]});
+				 buttons.components.find(button => button.data.custom_id == 'refresh').setDisabled(true); //disable refresh button while data is being updated
+				 await i.update({embeds: [embed], components: [buttons]});
+		
 				const new_data = await getValorantData(username, tagline, region);
 				let [new_embed, new_buttons] = createEmbed(new_data);
+				cache.set('embed', new_embed);	//update cache with new player data
+				cache.set('buttons', new_buttons);
 				await i.editReply({embeds: [new_embed], components: [new_buttons]});
 			} else if (i.customId === 'destruct'){
 				await i.message.delete();
 				console.log(`boom`);
 			} else if (i.customId === 'next') {
-
+				console.log('Displaying scoreboard')
+				if (cache.has('board')) {
+					await i.update({embeds: [cache.get('board')]})
+				} else {
+					console.log('Creating scoreboard for the first time...')
+					const board = createScoreboard(player);
+					cache.set('board', board);
+					console.log(`Scoreboard saved in cache.`);
+					await i.update({embeds: [board]})
+				}
 			} else if (i.customId === 'back') {
-
+				if (cache.has('embed') && cache.has('buttons')){
+					console.log('Displaying game stats');
+					await i.update({embeds: [cache.get('embed')], components: [cache.get('buttons')]});
+				}
 			}
-			
+			console.log(cache);
 		})
 	},
 	//getValorantData,
