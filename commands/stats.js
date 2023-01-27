@@ -50,7 +50,7 @@ async function getValorantData(username, tagline, region){
 		return player;
 }
 
-function createEmbed(player){
+function createEmbed(player, game_number){
 	let last_change = player.mmr.data[0].mmr_change_to_last_game > 0 ? `+${player.mmr.data[0].mmr_change_to_last_game}` : `${player.mmr.data[0].mmr_change_to_last_game}`;	//append "+" if positive
 	if (player.games[0].currenttier_patched == 'Unrated') {
 		last_change = '-';
@@ -60,26 +60,26 @@ function createEmbed(player){
 			.addComponents(
 				new ButtonBuilder()
 					.setCustomId('back')
-					.setStyle(ButtonStyle.Primary)
-					.setEmoji('⬅️')
+					.setStyle(ButtonStyle.Secondary)
+					.setLabel('🡠')
 			)
 			.addComponents(
 				new ButtonBuilder()
 					.setCustomId('refresh')
-					.setStyle(ButtonStyle.Primary)
-					.setEmoji('🔄')
+					.setStyle(ButtonStyle.Secondary)
+					.setLabel('⟳')
 			)
 			.addComponents(
 				new ButtonBuilder()
 					.setCustomId('next')
-					.setStyle(ButtonStyle.Primary)
-					.setEmoji('➡️')
+					.setStyle(ButtonStyle.Secondary)
+					.setLabel('🡢')
 			)
 			.addComponents(
 				new ButtonBuilder()
 					.setCustomId('destruct')
 					.setStyle(ButtonStyle.Danger)
-					.setEmoji('❌')
+					.setEmoji('💀')
 			)
 	const result = new EmbedBuilder()
 		.setColor('fa4454')
@@ -92,7 +92,7 @@ function createEmbed(player){
 			{name: 'Current Rank', value: `${player.mmr.data[0].currenttierpatched} (${player.mmr.data[0].ranking_in_tier} RR)`, inline: true},
 			//{name: `ELO`, value: `${player.mmr.data[0].elo}`, inline:true},
 			{name: `Change in ${player.mmr.data.length} games`, value: `${player.total_mmr_change} RR`, inline: true},
-			//{name: `HS in ${player.stats.headshots.length} games`, value: `${player.stats.average.toFixed(1)}%`, inline:true},
+			{name: `HS in ${player.stats.headshots.length} games`, value: `${player.stats.average.toFixed(1)}%`, inline:true},
 			//{name: `MMR History`, value: `${player.mmr_change_data}`}
 			//{name: '--------------------------------------------------------------------', value: "**-------------------------------------------------------------------**"}
 		)
@@ -147,7 +147,7 @@ function createScoreboard(player){ //displays data for last game scores
 		.setAuthor({name: `Last game scoreboard`, url: `https://tracker.gg/valorant/match/${player.history.data[0].metadata.matchid}?handle=${player.ign}`})
 		.addFields(
 			{name: '\u200b', value: `\u200b`, inline:true},
-			{name: 'Red', value: `\u200b`, inline: true},
+			{name: `Red (${player.history.data[0].teams.red.rounds_won})`, value: `\u200b`, inline: true},
 			{name: '\u200b', value: `\u200b`, inline:true},
 			{name: 'Agent', value: `${red_team.characters}`, inline:true},
 			{name: 'Player', value: `${red_team.names}`, inline:true},
@@ -156,7 +156,7 @@ function createScoreboard(player){ //displays data for last game scores
 			{name: '\u200b', value: `\u200b`},
 
 			{name: '\u200b', value: `\u200b`, inline:true},
-			{name: 'Blue', value: `\u200b`, inline: true},
+			{name: `Blue (${player.history.data[0].teams.blue.rounds_won})`, value: `\u200b`, inline: true},
 			{name: '\u200b', value: `\u200b`, inline:true},
 			{name: 'Agent', value: `${blue_team.characters}`, inline:true},
 			{name: 'Player', value: `${blue_team.names}`, inline:true},
