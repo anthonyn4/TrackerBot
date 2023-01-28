@@ -5,6 +5,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActionRow, ComponentType} = require('discord.js');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 //const {get, set} = require('./cache.js');
+let game_number = 0;
 
 async function getValorantData(username, tagline, region){
 	const player = {mmr_change_data: [],
@@ -50,9 +51,10 @@ async function getValorantData(username, tagline, region){
 		return player;
 }
 
-function createEmbed(player, game_number){
-	let last_change = player.mmr.data[0].mmr_change_to_last_game > 0 ? `+${player.mmr.data[0].mmr_change_to_last_game}` : `${player.mmr.data[0].mmr_change_to_last_game}`;	//append "+" if positive
-	if (player.games[0].currenttier_patched == 'Unrated') {
+//Creates an embed for display of the player's ith game statistics
+function createEmbed(player, i){
+	let last_change = player.mmr.data[i].mmr_change_to_last_game > 0 ? `+${player.mmr.data[i].mmr_change_to_last_game}` : `${player.mmr.data[i].mmr_change_to_last_game}`;	//append "+" if positive
+	if (player.games[i].currenttier_patched == 'Unrated') {
 		last_change = '-';
 	}
 
@@ -81,10 +83,16 @@ function createEmbed(player, game_number){
 					.setStyle(ButtonStyle.Danger)
 					.setEmoji('💀')
 			)
+			.addComponents(
+				new ButtonBuilder()
+					.setCustomId('scores')
+					.setStyle(ButtonStyle.Secondary)
+					.setLabel('Scores')
+			)
 	const result = new EmbedBuilder()
 		.setColor('fa4454')
 		.setAuthor({name: `Statistics for ${player.mmr.name}#${player.mmr.tag} - ${player.region.toUpperCase()}`, url: `https://tracker.gg/valorant/profile/riot/${player.ign}/overview`})
-		.setThumbnail(`${player.mmr.data[0].images.small}`)
+		.setThumbnail(`${player.mmr.data[i].images.small}`)
 		//.setTitle(`Statistics for ${player.mmr.data.name}#${player.mmr.data.tag}`)
 		.addFields(
 			//{name: 'Level', value: `${player.account.data.account_level}`, inline: true},
@@ -101,24 +109,24 @@ function createEmbed(player, game_number){
 			//{name: '\u200b', value: `\u200b`, inline:true},
 			//{name: `Date`, value: `${player.history.data[0].metadata.game_start_patched.split(",")[1]}`, inline: true},
 
-			{name: 'Map', value: `${player.history.data[0].metadata.map}`, inline:true},
-			{name: 'Score', value: `${player.history.data[0].teams[player.games[0].team.toLowerCase()].rounds_won}-${player.history.data[0].teams[player.games[0].team.toLowerCase()].rounds_lost}`, inline:true},
-			{name: 'Rank (in-game)', value: `${player.games[0].currenttier_patched}`, inline:true},
+			{name: 'Map', value: `${player.history.data[i].metadata.map}`, inline:true},
+			{name: 'Score', value: `${player.history.data[i].teams[player.games[i].team.toLowerCase()].rounds_won}-${player.history.data[i].teams[player.games[i].team.toLowerCase()].rounds_lost}`, inline:true},
+			{name: 'Rank (in-game)', value: `${player.games[i].currenttier_patched}`, inline:true},
 
-			{name: 'Agent', value: `${player.games[0].character}`, inline: true},
+			{name: 'Agent', value: `${player.games[i].character}`, inline: true},
 			//{name: 'Mode', value: `${player.history.data[0].metadata.mode}`, inline:true},
-			{name: 'K/D/A', value: `${player.games[0].stats.kills}/${player.games[0].stats.deaths}/${player.games[0].stats.assists}`, inline:true},
-			{name: 'HS', value: `${player.stats.headshots[0].toFixed(1)}%`, inline:true},
+			{name: 'K/D/A', value: `${player.games[i].stats.kills}/${player.games[i].stats.deaths}/${player.games[i].stats.assists}`, inline:true},
+			{name: 'HS', value: `${player.stats.headshots[i].toFixed(1)}%`, inline:true},
 			//{name: '\u200b', value: `\u200b`, inline:true},
 		)
-		.setImage(player.games[0].assets.card.wide)
+		.setImage(player.games[i].assets.card.wide)
 		//.setFooter({text: `Last updated: ${player.account.data.last_update}`});
 		return [result, row];
 }
 
-function createScoreboard(player){ //displays data for last game scores
-	player.history.data[0].players.red.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);	//sort the players based on score
-	player.history.data[0].players.blue.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);
+function createScoreboard(player,i){ //displays data for last game scores
+	player.history.data[i].players.red.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);	//sort the players based on score
+	player.history.data[i].players.blue.sort((a,b) => (a.stats.score < b.stats.score) ? 1 : -1);
 	let red_team = {characters: '',
 					names: '',
 					kdas: ''}, 
@@ -126,13 +134,13 @@ function createScoreboard(player){ //displays data for last game scores
 					names: '',
 					kdas: ''};
 	//console.log(player.history.data[0].players.red);
-	for (let p of player.history.data[0].players.red){
+	for (let p of player.history.data[i].players.red){
 		//const temp = `${p.character} ${p.name} ${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
 		red_team.characters += `${p.character}\n`;
 		red_team.names += `${p.name}\n`;
 		red_team.kdas += `${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
 	}
-	for (let p of player.history.data[0].players.blue){
+	for (let p of player.history.data[i].players.blue){
 		//const temp = `${p.character} ${p.name} ${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}\n`;
 		blue_team.characters += `${p.character}\n`;
 		blue_team.names += `${p.name}\n`;
@@ -147,7 +155,7 @@ function createScoreboard(player){ //displays data for last game scores
 		.setAuthor({name: `Last game scoreboard`, url: `https://tracker.gg/valorant/match/${player.history.data[0].metadata.matchid}?handle=${player.ign}`})
 		.addFields(
 			{name: '\u200b', value: `\u200b`, inline:true},
-			{name: `Red (${player.history.data[0].teams.red.rounds_won})`, value: `\u200b`, inline: true},
+			{name: `Red (${player.history.data[i].teams.red.rounds_won})`, value: `\u200b`, inline: true},
 			{name: '\u200b', value: `\u200b`, inline:true},
 			{name: 'Agent', value: `${red_team.characters}`, inline:true},
 			{name: 'Player', value: `${red_team.names}`, inline:true},
@@ -156,7 +164,7 @@ function createScoreboard(player){ //displays data for last game scores
 			{name: '\u200b', value: `\u200b`},
 
 			{name: '\u200b', value: `\u200b`, inline:true},
-			{name: `Blue (${player.history.data[0].teams.blue.rounds_won})`, value: `\u200b`, inline: true},
+			{name: `Blue (${player.history.data[i].teams.blue.rounds_won})`, value: `\u200b`, inline: true},
 			{name: '\u200b', value: `\u200b`, inline:true},
 			{name: 'Agent', value: `${blue_team.characters}`, inline:true},
 			{name: 'Player', value: `${blue_team.names}`, inline:true},
@@ -191,8 +199,7 @@ module.exports = {
 					{name: 'LATAM', value: 'na'},
 				)),
 	async execute(interaction) {
-		const cache = new Map();
-
+		
 		const filter = i => {			
 			//i.deferUpdate();
 			return i.message.interaction.id === interaction.id;	//to make sure button press only affects message its attached to
@@ -210,46 +217,51 @@ module.exports = {
 			await interaction.followUp({content: `Failed to find player ${username}#${tagline} ${region}`});
 			return;	
 		}
-		let [embed, buttons] = createEmbed(player);
-		cache.set('embed', embed);	//save initial data in cache
-		cache.set('buttons', buttons);
-		cache.set('board', createScoreboard(player));
-		console.log(`${username} data saved in cache.`);
+		let [embed, buttons] = createEmbed(player,game_number);;
 		await interaction.followUp({embeds: [embed], components: [buttons]});
 
-		collector.on('collect', async i => {
-			let board;
-			if (i.customId === 'refresh') {
-				console.log(`${i.user.username} refreshed data for ${username}#${tagline}`);
-				buttons.components.find(button => button.data.custom_id == 'refresh').setDisabled(true); //disable refresh button while data is being updated
-				await i.update({embeds: [embed], components: [buttons]});
 		
-				const new_data = await getValorantData(username, tagline, region);
-				let [new_embed, new_buttons] = createEmbed(new_data);
-				board = createScoreboard(new_data);
-				cache.set('embed', new_embed);	//update cache with new player data
-				cache.set('buttons', new_buttons);
-				cache.set('board', board);
-				await i.editReply({embeds: [new_embed], components: [new_buttons]});
-			} else if (i.customId === 'destruct'){	//for funsies
-				await i.message.delete();
-				console.log(`boom`);
-			} else if (i.customId === 'next') {
-				console.log(`Displaying scoreboard for ${username}`)
-				if (cache.has('board')) {
-					await i.update({embeds: [cache.get('board')]})
-				} else {	//in case a scoreboard was somehow not created at the start
-					console.log('Creating scoreboard for the first time...')
-					board = createScoreboard(player);
-					cache.set('board', board);
-					console.log(`Scoreboard for ${username} saved in cache.`);
-					await i.update({embeds: [board]})
-				}
-			} else if (i.customId === 'back') {
-				if (cache.has('embed') && cache.has('buttons')){
-					console.log(`Displaying game stats for ${username}`);
-					await i.update({embeds: [cache.get('embed')], components: [cache.get('buttons')]});
-				}
+		collector.on('collect', async interaction => {
+			let data;
+			let match;
+			let board;
+			switch (interaction.customId) {
+				case 'refresh':
+					console.log(`${interaction.user.username} refreshed data for ${username}#${tagline}`);
+					buttons.components.find(button => button.data.custom_id == 'refresh').setDisabled(true); //disable refresh button while data is being updated
+					await interaction.update({embeds: [embed], components: [buttons]});
+			
+					data = await getValorantData(username, tagline, region);
+					message = createEmbed(data, game_number);
+					board = createScoreboard(data, game_number);
+					await interaction.editReply({embeds: [match.result], components: [match.row]});
+					break;
+				case 'destruct':
+					await interaction.message.delete();
+					console.log(`boom`);
+					break;
+				case 'next':
+					game_number = game_number ? --game_number : 0; //subtract if non-zero otherwise return 0
+					//console.log(game_number);
+					match = createEmbed(player, game_number);
+					board = createScoreboard(player, game_number);
+					await interaction.update({embeds: [match[0]], components: [match[1]]});
+					break;
+				case 'back':
+					if (game_number < player.games.length-1) {
+						game_number++;
+					} else {
+						game_number = player.games.length-1
+					}
+					//console.log(game_number);
+					match = createEmbed(player, game_number);
+					board = createScoreboard(player, game_number);
+					await interaction.update({embeds: [match[0]], components: [match[1]]});
+					break;
+				case 'scores':
+					board = createScoreboard(player, game_number);	
+					await interaction.update({embeds: [board]});
+					break;
 			}
 			//console.log(cache);
 		})
